@@ -614,8 +614,116 @@ def recommend_similar_vms(data: SimplifiedInput):
         
         # Get query VM features and prediction
         has_gpu = 1.0 if data.gpu_count > 0 else 0.0
+        
+        # Use same intelligent encoding as simplified prediction
+        memory_cpu_ratio = data.memory_gb / max(data.vcpus, 1)
+        if memory_cpu_ratio >= 8:
+            machine_family_str = "m2"
+        elif memory_cpu_ratio <= 2:
+            machine_family_str = "c2"
+        else:
+            machine_family_str = "n2"
+        
+        try:
+            machine_family_encoded = float(label_encoders['machine_family'].transform([machine_family_str])[0])
+        except:
+            machine_family_encoded = 0.0
+        
+        machine_type_str = f"{machine_family_str}-standard-{int(data.vcpus)}"
+        try:
+            machine_type_encoded = float(label_encoders['machine_type'].transform([machine_type_str])[0])
+        except:
+            machine_type_encoded = 0.0
+        
+        try:
+            cpu_arch_encoded = float(label_encoders['cpu_arch'].transform(['x86_64'])[0])
+        except:
+            cpu_arch_encoded = 0.0
+        
+        try:
+            region_encoded = float(label_encoders['region'].transform(['us-central1'])[0])
+            region_code_encoded = float(label_encoders['region_code'].transform(['US-CENTRAL1'])[0])
+        except:
+            region_encoded = 0.0
+            region_code_encoded = 0.0
+        
+        try:
+            zone_encoded = float(label_encoders['zone'].transform(['us-central1-a'])[0])
+        except:
+            zone_encoded = 0.0
+        
+        try:
+            os_encoded = float(label_encoders['os'].transform(['Linux'])[0])
+        except:
+            os_encoded = 0.0
+        
+        try:
+            network_tier_encoded = float(label_encoders['network_tier'].transform(['premium'])[0])
+        except:
+            network_tier_encoded = 0.0
+        
+        try:
+            price_model_encoded = float(label_encoders['price_model'].transform(['on-demand'])[0])
+        except:
+            price_model_encoded = 0.0
+        
+        try:
+            currency_encoded = float(label_encoders['currency'].transform(['USD'])[0])
+        except:
+            currency_encoded = 0.0
+        
+        try:
+            boot_disk_type_encoded = float(label_encoders['boot_disk_type'].transform(['pd-standard'])[0])
+        except:
+            boot_disk_type_encoded = 0.0
+        
         gpu_model_lower = data.gpu_model.lower()
-        gpu_model_encoded = 1.0 if gpu_model_lower not in ['none', '', 'no'] else 0.0
+        if gpu_model_lower not in ['none', '', 'no'] and data.gpu_count > 0:
+            try:
+                gpu_model_encoded = float(label_encoders['gpu_model'].transform([gpu_model_lower])[0])
+            except:
+                if 't4' in gpu_model_lower:
+                    try:
+                        gpu_model_encoded = float(label_encoders['gpu_model'].transform(['nvidia-tesla-t4'])[0])
+                    except:
+                        gpu_model_encoded = 1.0
+                elif 'v100' in gpu_model_lower:
+                    try:
+                        gpu_model_encoded = float(label_encoders['gpu_model'].transform(['nvidia-tesla-v100'])[0])
+                    except:
+                        gpu_model_encoded = 2.0
+                else:
+                    gpu_model_encoded = 1.0
+        else:
+            try:
+                gpu_model_encoded = float(label_encoders['gpu_model'].transform(['none'])[0])
+            except:
+                gpu_model_encoded = 0.0
+        
+        try:
+            egress_dest_encoded = float(label_encoders['egress_destination'].transform(['internet'])[0])
+        except:
+            egress_dest_encoded = 0.0
+        
+        try:
+            billing_freq_encoded = float(label_encoders['billing_frequency'].transform(['monthly'])[0])
+        except:
+            billing_freq_encoded = 0.0
+        
+        try:
+            feedback_encoded = float(label_encoders['feedback'].transform(['neutral'])[0])
+        except:
+            feedback_encoded = 0.0
+        
+        try:
+            sud_eligible_encoded = float(label_encoders['sustained_use_discount_eligible'].transform(['yes'])[0])
+        except:
+            sud_eligible_encoded = 1.0
+        
+        try:
+            preempt_avail_encoded = float(label_encoders['preemptible_available'].transform(['yes'])[0])
+        except:
+            preempt_avail_encoded = 1.0
         
         gpu_hourly_cost = 0.0
         if has_gpu:
@@ -634,42 +742,41 @@ def recommend_similar_vms(data: SimplifiedInput):
             else:
                 gpu_hourly_cost = 0.5 * data.gpu_count
         
-        # Query features (must match model feature order - 34 features)
+        # Query features (33 features, properly encoded)
         query_features = [
-            0.0,  # machine_family
-            0.0,  # machine_type
-            float(data.vcpus),  # vcpus
-            0.0,  # cpu_arch
-            0.0,  # region
-            0.0,  # region_code
-            0.0,  # zone
-            0.0,  # os
-            0.0,  # network_tier
-            0.0,  # price_model
-            1.0,  # sustained_use_discount_eligible
+            machine_family_encoded,
+            machine_type_encoded,
+            float(data.vcpus),
+            cpu_arch_encoded,
+            region_encoded,
+            region_code_encoded,
+            zone_encoded,
+            os_encoded,
+            network_tier_encoded,
+            price_model_encoded,
+            sud_eligible_encoded,
             0.85,  # cud_1yr_discount
             0.75,  # cud_3yr_discount
-            1.0,  # preemptible_available
-            0.0,  # currency
-            0.0,  # boot_disk_type
-            float(data.boot_disk_gb),  # boot_disk_gb
+            preempt_avail_encoded,
+            currency_encoded,
+            boot_disk_type_encoded,
+            float(data.boot_disk_gb),
             0.0,  # local_ssd_count
             0.0,  # local_ssd_total_gb
-            gpu_model_encoded,  # gpu_model
-            float(data.gpu_count),  # gpu_count
-            gpu_hourly_cost,  # gpu_hourly_usd
-            0.0,  # egress_destination
+            gpu_model_encoded,
+            float(data.gpu_count),
+            gpu_hourly_cost,
+            egress_dest_encoded,
             0.0,  # egress_gb
             0.0,  # egress_unit_price_usd
-            0.0,  # billing_frequency
-            float(data.usage_hours_month),  # usage_hours_month
-            0.0,  # feedback
-            float(data.memory_gb),  # memory_gb
+            billing_freq_encoded,
+            float(data.usage_hours_month),
+            feedback_encoded,
+            float(data.memory_gb),
             0.0,  # sustained_use_discount
             0.0,  # preemptible
-            has_gpu,  # has_gpu
+            has_gpu,
             0.0,  # has_local_ssd
-            1.0,  # price_category
         ]
         query_array = np.array(query_features).reshape(1, -1)
         query_scaled = scaler_cluster.transform(query_array)
@@ -704,7 +811,7 @@ def recommend_similar_vms(data: SimplifiedInput):
                 if vcpus <= 0 or memory_gb <= 0:
                     continue
                     
-                # Build feature vector for this VM (34 features to match model)
+                # Build feature vector for this VM (33 features)
                 vm_has_gpu = 1.0 if gpu_count > 0 else 0.0
                 vm_features = [
                     0.0,  # machine_family
@@ -740,7 +847,6 @@ def recommend_similar_vms(data: SimplifiedInput):
                     0.0,  # preemptible
                     vm_has_gpu,  # has_gpu
                     0.0,  # has_local_ssd
-                    1.0,  # price_category
                 ]
                 vm_array = np.array(vm_features).reshape(1, -1)
                 vm_scaled = scaler_cluster.transform(vm_array)
