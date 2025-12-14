@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GCP VM Pricing Calculator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>☁️ GCP VM Pricing</h1>
+            <p class="subtitle">ML-Powered Cost Predictions</p>
+        </header>
+
+        <!-- API Status -->
+        <div id="apiStatus" class="status-bar">
+            <span class="status-indicator"></span>
+            <span id="statusText">Connecting to API...</span>
+        </div>
+
+        <!-- Input Form -->
+        <div class="card">
+            <h2>VM Configuration</h2>
+            <form id="vmForm">
+                <div class="form-group">
+                    <label for="vcpus">vCPUs:</label>
+                    <input type="number" id="vcpus" name="vcpus" min="1" max="96" value="2" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="memory">Memory (GB):</label>
+                    <input type="number" id="memory" name="memory" min="0.5" max="624" step="0.5" value="8" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="storage">Storage (GB):</label>
+                    <input type="number" id="storage" name="storage" min="10" max="65536" value="100" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="gpuCount">GPU Count:</label>
+                    <input type="number" id="gpuCount" name="gpuCount" min="0" max="8" value="0">
+                </div>
+
+                <div class="form-group">
+                    <label for="gpuModel">GPU Model:</label>
+                    <select id="gpuModel" name="gpuModel">
+                        <option value="none">No GPU</option>
+                        <option value="k80">NVIDIA K80</option>
+                        <option value="t4">NVIDIA T4</option>
+                        <option value="p4">NVIDIA P4</option>
+                        <option value="p100">NVIDIA P100</option>
+                        <option value="v100">NVIDIA V100</option>
+                        <option value="a100">NVIDIA A100</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="usageHours">Usage Hours/Month:</label>
+                    <input type="number" id="usageHours" name="usageHours" min="1" max="744" value="730" required>
+                    <small>730 hours = 24/7 usage</small>
+                </div>
+
+                <button type="submit" class="btn btn-primary" id="predictBtn">
+                    <span id="btnText">💰 Get Prediction</span>
+                    <span id="btnLoader" class="loader" style="display: none;"></span>
+                </button>
+            </form>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results" style="display: none;">
+            <!-- Cost Prediction -->
+            <div class="card result-card">
+                <h2>💵 Cost Prediction</h2>
+                <div class="prediction-result">
+                    <div class="cost-display">
+                        <span class="cost-label">Monthly Cost:</span>
+                        <span class="cost-value" id="monthlyCost">$0.00</span>
+                    </div>
+                    <div class="category-badge">
+                        <span id="priceCategory">Medium</span>
+                    </div>
+                </div>
+                <div class="confidence-bars">
+                    <div class="confidence-item">
+                        <span>Low:</span>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="probLow" style="width: 0%"></div>
+                        </div>
+                        <span id="probLowText">0%</span>
+                    </div>
+                    <div class="confidence-item">
+                        <span>Medium:</span>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="probMedium" style="width: 0%"></div>
+                        </div>
+                        <span id="probMediumText">0%</span>
+                    </div>
+                    <div class="confidence-item">
+                        <span>High:</span>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="probHigh" style="width: 0%"></div>
+                        </div>
+                        <span id="probHighText">0%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sentiment Analysis -->
+            <div id="sentimentSection" class="card result-card" style="display: none;">
+                <h2>😊 Value Analysis</h2>
+                <div class="sentiment-result">
+                    <div class="sentiment-emoji" id="sentimentEmoji">👍</div>
+                    <div class="sentiment-text">
+                        <div class="sentiment-label" id="sentimentLabel">Fair Value</div>
+                        <div class="sentiment-meaning" id="sentimentMeaning">Good value for the price</div>
+                    </div>
+                </div>
+                <div class="value-score">
+                    <span>Value Score:</span>
+                    <span id="valueScore" class="score-value">0.00</span>
+                </div>
+            </div>
+
+            <!-- Cluster Info -->
+            <div class="card result-card">
+                <h2>📊 VM Classification</h2>
+                <div class="cluster-info">
+                    <div class="info-item">
+                        <span class="info-label">Cluster Group:</span>
+                        <span class="info-value" id="clusterGroup">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Total Clusters:</span>
+                        <span class="info-value" id="totalClusters">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recommendations -->
+            <div class="card result-card">
+                <h2>🎯 Similar VM Recommendations</h2>
+                <button class="btn btn-secondary" id="getRecommendations">
+                    <span id="recBtnText">Load Recommendations</span>
+                    <span id="recBtnLoader" class="loader" style="display: none;"></span>
+                </button>
+                <div id="recommendationsList" style="display: none;">
+                    <div id="recommendationsContainer"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Message -->
+        <div id="errorMessage" class="error-message" style="display: none;"></div>
+
+        <!-- Footer -->
+        <footer>
+            <p>Powered by FastAPI ML Backend</p>
+        </footer>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>
